@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bioinformatics Pipeline Walkthrough</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a2e; color: #eee; }
+  .slide { width: 100vw; height: 100vh; display: none; flex-direction: column; justify-content: center; align-items: center; padding: 8vh 10vw; text-align: center; }
+  .slide.active { display: flex; }
+  .slide h1 { font-size: 3.5rem; margin-bottom: 1rem; background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .slide h2 { font-size: 2.5rem; margin-bottom: 1rem; color: #667eea; }
+  .slide p { font-size: 1.5rem; line-height: 1.8; max-width: 800px; color: #ccc; margin-bottom: 1rem; }
+  .slide ul { font-size: 1.4rem; text-align: left; line-height: 2; margin-bottom: 1rem; list-style-position: inside; }
+  .slide code { background: #16213e; padding: 2px 8px; border-radius: 4px; font-size: 1.2rem; font-family: monospace; }
+  .slide pre { background: #16213e; padding: 1.5rem; border-radius: 8px; text-align: left; overflow-x: auto; max-width: 90%; margin: 1rem 0; }
+  .slide pre code { background: none; padding: 0; }
+  .progress { position: fixed; bottom: 0; left: 0; height: 4px; background: #667eea; transition: width 0.3s; z-index: 10; }
+  .slide-num { position: fixed; bottom: 12px; right: 20px; font-size: 0.9rem; color: #555; }
+</style>
+</head>
+<body>
+<div class="slide">
+<h1>Bioinformatics Advanced Python Project</h1>
+<h2>scRNA-seq Pipeline Walkthrough</h2>
+<p>Your Guide to the Galaxy of Cells 🌌</p>
+</div>
+
+<div class="slide">
+<h1>The Goal 🎯</h1>
+<p>We want to group cells based on their gene activity.</p>
+<ul>
+<li>**Input:** Raw gene expression data (count matrix).</li>
+<li>**Process:** Clean -> Normalize -> Reduce Dimensions -> Cluster.</li>
+<li>**Output:** Clusters of cell types (e.g., T-cells vs B-cells).</li>
+</ul>
+</div>
+
+<div class="slide">
+<h1>Your Role: The Foundation 🏗️</h1>
+<p><strong>Data Ingestion & Preprocessing</strong></p>
+<p>If you get this wrong, the rest of the team fails.</p>
+<p>Your job is to feed clean, normalized data to the clustering algorithms.</p>
+</div>
+
+<div class="slide">
+<h1>Step 1: Loading & Transposing 🔄</h1>
+<p><strong>Problem:</strong></p>
+<p>Raw data often comes as <code>Genes x Cells</code> (genes are rows).</p>
+<p>Python tools (<code>Scanpy</code>) expect <code>Cells x Genes</code> (cells are rows).</p>
+<p><strong>Solution:</strong></p>
+<p>We transpose the matrix immediately after loading.</p>
+<pre><code>adata = sc.read_csv(file_path).T
+</code></pre>
+</div>
+
+<div class="slide">
+<h1>Step 2: Quality Control (QC) 🧹</h1>
+<p><strong>Why?</strong></p>
+<ul>
+<li>**Dead cells:** Have very few expressed genes.</li>
+<li>**Empty droplets:** The sequencer read a droplet with no cell inside.</li>
+<li>**Doublets:** Two cells stuck together (looks like one super-cell).</li>
+</ul>
+<p><strong>Action:</strong></p>
+<p>Filter out cells with too few genes (<code>min_genes=200</code>).</p>
+<p>Filter out genes seen in too few cells (<code>min_cells=3</code>).</p>
+</div>
+
+<div class="slide">
+<h1>Step 3: Normalization ⚖️</h1>
+<p><strong>Why?</strong></p>
+<p>Sequencing depth varies.</p>
+<ul>
+<li>Cell A: 10,000 reads</li>
+<li>Cell B: 5,000 reads</li>
+</ul>
+<p>If Cell A has 2x more reads for Gene X, is it biologically more active?</p>
+<p>Maybe not. It might just be sequenced deeper.</p>
+<p><strong>Action:</strong></p>
+<p>Normalize every cell to have the same total count (e.g., 10,000).</p>
+<pre><code>sc.pp.normalize_total(adata, target_sum=1e4)
+</code></pre>
+</div>
+
+<div class="slide">
+<h1>Step 4: Log Transformation 📉</h1>
+<p><strong>Why?</strong></p>
+<p>Gene expression follows a power law.</p>
+<p>Some genes are expressed 1000x more than others.</p>
+<p>This huge range dominates statistical analysis.</p>
+<p><strong>Action:</strong></p>
+<p>Take the log (<code>log1p</code> = log(x+1)) to bring values into a comparable range.</p>
+<pre><code>sc.pp.log1p(adata)
+</code></pre>
+</div>
+
+<div class="slide">
+<h1>Step 5: Feature Selection 🌟</h1>
+<p><strong>Why?</strong></p>
+<p>We have 20,000+ genes.</p>
+<p>Most are "housekeeping" genes (always on) or noise (rarely on).</p>
+<p>They don't help distinguish cell types.</p>
+<p><strong>Action:</strong></p>
+<p>Select "Highly Variable Genes" (HVGs) — genes that differ strongly between cells.</p>
+<p>These hold the biological signal.</p>
+<pre><code>sc.pp.highly_variable_genes(adata)
+</code></pre>
+</div>
+
+<div class="slide">
+<h1>Your Pipeline Code 💻</h1>
+<p>I've written <code>src/preprocessing/data_pipeline.py</code> for you.</p>
+<p><strong>How to run it:</strong></p>
+<p>1.  Place raw <code>.csv</code> files in <code>data/raw/</code>.</p>
+<p>2.  Update the filename in the script.</p>
+<p>3.  Run: <code>python src/preprocessing/data_pipeline.py</code></p>
+</div>
+
+<div class="slide">
+<h1>Next Steps 🚀</h1>
+<p>1.  <strong>Clone the Repo:</strong> <code>git clone ...</code></p>
+<p>2.  <strong>Install:</strong> <code>pip install -r requirements.txt</code></p>
+<p>3.  <strong>Run:</strong> Execute the pipeline script.</p>
+<p>4.  <strong>Verify:</strong> Check the output shape (should be <code>Cells x Genes</code>).</p>
+<p>Good luck! You're building the bedrock of this analysis.</p>
+</div>
+
+<div class="progress" id="progress"></div>
+<div class="slide-num" id="slideNum"></div>
+<script>
+let current = 0;
+const slides = document.querySelectorAll('.slide');
+function show(n) {
+  current = Math.max(0, Math.min(n, slides.length - 1));
+  slides.forEach(s => s.classList.remove('active'));
+  slides[current].classList.add('active');
+  document.getElementById('progress').style.width = ((current + 1) / slides.length * 100) + '%';
+  document.getElementById('slideNum').textContent = (current + 1) + ' / ' + slides.length;
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ') show(current + 1);
+  if (e.key === 'ArrowLeft') show(current - 1);
+  if (e.key === 'Home') show(0);
+  if (e.key === 'End') show(slides.length - 1);
+});
+document.addEventListener('click', e => {
+  if (e.clientX > window.innerWidth / 2) show(current + 1);
+  else show(current - 1);
+});
+show(0);
+</script>
+</body>
+</html>
